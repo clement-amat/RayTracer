@@ -17,7 +17,7 @@ bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
   float dist = plane->geom.plane.dist;
   float dotDN = dot(d, n);
   
-  if (dotDN != 0.f) {
+  if (abs(dotDN) > acne_eps) {
     point3 o = ray->orig;
     float t;
 
@@ -26,11 +26,10 @@ bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
       ray->tmax = t;
       // normal intersection = normal au plan
       // pt intersect : o + t* direction
-      intersection->normal = n;
+      intersection->normal = n ;
       intersection->position = o + t * d;
       return true;
     }
-
   }
   return false;
 
@@ -39,43 +38,51 @@ bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
 bool intersectSphere(Ray *ray, Intersection *intersection, Object *obj) {
   float a = 1;
   float b = 2 * dot(ray->dir, (ray->orig - obj->geom.sphere.center));
+
   vec3 oMinusC = (ray->orig - obj->geom.sphere.center);
   float c = dot(oMinusC,oMinusC) 
               - obj->geom.sphere.radius * obj->geom.sphere.radius;
 
-  float delta = b * b - 4 * a * c;
+  float delta = b * b - 4.f * a * c;
 
-  if (delta == 0) {     // une solution
-    float t = (- b - sqrt(delta)) / 2.f * a;
+  if (delta == 0.f) {     // une solution
+    float t = (- b) / 2.f * a;
+
     if (t >= ray->tmin && t <= ray->tmax) {
+      ray->tmax = t;
       intersection->position = ray->orig + t * ray->dir;
-      intersection->normal = normalize(intersection->position - c);
+      intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
       return true;
     }
 
-    return false;  
-  } else if (delta > 0) {    // deux solutions 
-      float t1 = (- b - sqrt(delta)) / 2.f * a;
-      float t2 = (- b + sqrt(delta)) / 2.f * a;
-
-      if (t1 >= ray->tmin && t1 <= ray->tmax && t2 >= ray->tmin && t2 <= ray->tmax) {
-
-        if (t1 <= t2) {
+  } else if (delta > 0.f) {    // deux solutions 
+      float racineDelta = sqrt(delta);
+      float t1 = (- b - racineDelta) / 2.f * a;
+      float t2 = (- b + racineDelta) / 2.f * a;
+      bool t1Valide = t1 >= ray->tmin && t1 <= ray->tmax;
+      bool t2Valide = t2 >= ray->tmin && t2 <= ray->tmax;
+      
+      if (t1Valide && t2Valide) {
+        if (t1 < t2) {
           intersection->position = ray->orig + t1 * ray->dir;
+          ray->tmax = t1;
         } else {
           intersection->position = ray->orig + t2 * ray->dir;
+          ray->tmax = t2;
         }
-        intersection->normal = normalize(intersection->position - c);
+        intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
         return true;
 
-      } else if (t1 >= ray->tmin && t1 <= ray->tmax) {    // seul t1 valide
+      } else if (t1Valide) {    // seul t1 valide
         intersection->position = ray->orig + t1 * ray->dir;
-        intersection->normal = normalize(intersection->position - c);
+        intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
+        ray->tmax = t1;
         return true;
 
-      } else if (t2 >= ray->tmin && t2 <= ray->tmax) {    // seul t2 valide
+      } else if (t2Valide) {    // seul t2 valide
         intersection->position = ray->orig + t2 * ray->dir;
-        intersection->normal = normalize(intersection->position - c);
+        intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
+        ray->tmax = t2;
         return true;
       }
   }

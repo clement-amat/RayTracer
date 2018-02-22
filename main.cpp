@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
 
     strncpy(basename, argv[1], 256);
 
-    int scene_id = 1;
+    int scene_id = 0;
     if(argc == 3) {
         scene_id = atoi(argv[2]);
     }
