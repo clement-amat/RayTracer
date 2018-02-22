@@ -10,6 +10,7 @@
 /// acne_eps is a small constant used to prevent acne when computing intersection
 //  or boucing (add this amount to the position before casting a new ray !
 const float acne_eps = 1e-4;
+const float  INV_PI_F= 0.318309f;
 
 bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
   vec3 n = plane->geom.plane.normal;
@@ -28,6 +29,7 @@ bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
       // pt intersect : o + t* direction
       intersection->normal = n ;
       intersection->position = o + t * d;
+      intersection->mat = &plane->mat;
       return true;
     }
   }
@@ -52,6 +54,7 @@ bool intersectSphere(Ray *ray, Intersection *intersection, Object *obj) {
       ray->tmax = t;
       intersection->position = ray->orig + t * ray->dir;
       intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
+      intersection->mat = &obj->mat;
       return true;
     }
 
@@ -85,6 +88,7 @@ bool intersectSphere(Ray *ray, Intersection *intersection, Object *obj) {
         ray->tmax = t2;
         return true;
       }
+      intersection->mat = &obj->mat;
   }
   
   // pas de pts d'intersection valide
@@ -96,7 +100,7 @@ bool intersectScene(const Scene *scene, Ray *ray, Intersection *intersection) {
   size_t objectCount = scene->objects.size();
   bool hasIntersection = false;
 
-  //!\todo loop on each object of the scene to compute intersection
+  // loop on each object of the scene to compute intersection
   for (size_t i = 0 ; i < objectCount ; i++) {
     if (scene->objects[i]->geom.type == SPHERE) {
       if (intersectSphere(ray, intersection, scene->objects[i])) {
@@ -205,12 +209,20 @@ color3 RDM_bsdf(float LdotH, float NdotH, float VdotH, float LdotN, float VdotN,
 
 /* --------------------------------------------------------------------------- */
 
+/**
+ * n : normale à la surface
+ * v : direction de l'observation
+ * l : direction de l'éclairage
+ * lc : couleur de la lumière
+ * mat : materiau
+ */ 
 color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
-  color3 ret = color3(0.f);
+  color3 ret = color3(0);
 
-  //! \todo compute bsdf, return the shaded color taking into account the
-  //! lightcolor
-  
+  float scalaire = dot(l, n);
+  if (scalaire > acne_eps) {
+    ret = color3(mat->diffuseColor * INV_PI_F * scalaire * lc);
+  } 
 
   return ret;
 	    
@@ -221,7 +233,15 @@ color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {
   Intersection intersection;
 
   if (intersectScene(scene, ray, &intersection)) {
-    return color3(0.5f * intersection.normal + 0.5f);
+    // pour chaque source de lumière additionner les contributions :
+    color3 color = color3(0);
+    for (size_t i = 0 ; i < scene->lights.size() ; i++) {
+      color += shade(intersection.normal, -(ray->dir), 
+                     normalize(intersection.position - scene->lights.at(i)->position),
+                     scene->lights.at(i)->color, intersection.mat);
+   
+    }
+    return color;
   } else {
     return scene->skyColor;
   }
