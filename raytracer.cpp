@@ -73,6 +73,7 @@ bool intersectSphere(Ray *ray, Intersection *intersection, Object *obj) {
           intersection->position = ray->orig + t2 * ray->dir;
           ray->tmax = t2;
         }
+        intersection->mat = &obj->mat;
         intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
         return true;
 
@@ -80,15 +81,17 @@ bool intersectSphere(Ray *ray, Intersection *intersection, Object *obj) {
         intersection->position = ray->orig + t1 * ray->dir;
         intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
         ray->tmax = t1;
+        intersection->mat = &obj->mat;
         return true;
 
       } else if (t2Valide) {    // seul t2 valide
         intersection->position = ray->orig + t2 * ray->dir;
         intersection->normal = normalize(intersection->position - obj->geom.sphere.center);
         ray->tmax = t2;
+        intersection->mat = &obj->mat;
         return true;
       }
-      intersection->mat = &obj->mat;
+      
   }
   
   // pas de pts d'intersection valide
@@ -220,7 +223,7 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
   color3 ret = color3(0);
 
   float scalaire = dot(l, n);
-  if (scalaire > acne_eps) {
+  if (scalaire > 0.f) {
     ret = color3(mat->diffuseColor * INV_PI_F * scalaire * lc);
   } 
 
@@ -236,9 +239,9 @@ color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {
     // pour chaque source de lumière additionner les contributions :
     color3 color = color3(0);
     for (size_t i = 0 ; i < scene->lights.size() ; i++) {
-      color += shade(intersection.normal, -(ray->dir), 
-                     normalize(intersection.position - scene->lights.at(i)->position),
-                     scene->lights.at(i)->color, intersection.mat);
+      color = color + shade(-intersection.normal, -(ray->dir), 
+                            normalize(intersection.position - scene->lights.at(i)->position),
+                            scene->lights.at(i)->color, intersection.mat);
    
     }
     return color;
