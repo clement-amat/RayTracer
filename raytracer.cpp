@@ -12,6 +12,7 @@
 //  or boucing (add this amount to the position before casting a new ray !
 const float acne_eps = 1e-4;
 const float  INV_PI_F= 0.318309f;
+const int LIMITE_REBOND = 100;
 
 bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
   vec3 n = plane->geom.plane.normal;
@@ -256,11 +257,12 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
 //! if tree is not null, use intersectKdTree to compute the intersection instead of intersect scene
 color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {  
   Intersection intersection;
+  color3 color = color3(0);
 
   if (intersectScene(scene, ray, &intersection)) {   // intersection entre le rayon est un objet de la scene
-    color3 color = color3(0);
     Ray rayonOmbre;
     Intersection intersectionOmbre;
+    Ray rayonReflechi;
 
     // pour chaque source de lumière additionner les contributions :
     for (size_t i = 0 ; i < scene->lights.size() ; i++) {
@@ -274,11 +276,20 @@ color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {
                             scene->lights.at(i)->color, intersection.mat);
       }
     }
-    
-    return color;
+
+
+    vec3 directionRayonReflechi = reflect(ray->dir, intersection.normal);
+    rayInit(&rayonReflechi, intersection.position + acne_eps * directionRayonReflechi, directionRayonReflechi);
+    rayonReflechi.depth = ray->depth + 1;
+    if (rayonReflechi.depth < LIMITE_REBOND) {
+      color += RDM_Fresnel(1.f, 1.f, intersection.mat->IOR) * trace_ray(scene, &rayonReflechi, tree);
+    }
+
   } else {
-    return scene->skyColor;
+    color = scene->skyColor;
   }
+
+  return color;
 }
 
 void renderImage(Image *img, Scene *scene) {
