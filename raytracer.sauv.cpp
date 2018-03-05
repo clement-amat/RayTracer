@@ -172,7 +172,7 @@ float RDM_G1(float DdotH, float DdotN, float alpha) {
   b = 1.f / (alpha * tanTetaX);
   k = DdotH / DdotN;
 
-  if ( k > 0.f && b < 1.6f) {
+  if ( k > 0.f && b < 1.6) {
     return (3.535f * b + 2.181f * b * b) / (1.f + 2.276f * b + 2.577f * b * b);
   }
 
@@ -248,7 +248,7 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
   float VdotH = dot(v, half);
   float LdotN = dot(l, n);
   float VdotN = dot(v, n);
-  ret = color3(lc * RDM_bsdf(LdotH, NdotH, VdotH, LdotN, VdotN, mat) * LdotN);
+  ret = lc * RDM_bsdf(LdotH, NdotH, VdotH, LdotN, VdotN, mat) * LdotN;
   return ret;
 	
 }
@@ -256,21 +256,20 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
 //! if tree is not null, use intersectKdTree to compute the intersection instead of intersect scene
 color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {  
   Intersection intersection;
+  Intersection intersectionOmbre;
 
   if (intersectScene(scene, ray, &intersection)) {   // intersection entre le rayon est un objet de la scene
     color3 color = color3(0);
     Ray rayonOmbre;
-    Intersection intersectionOmbre;
 
     // pour chaque source de lumière additionner les contributions :
     for (size_t i = 0 ; i < scene->lights.size() ; i++) {
-      vec3 l = normalize(scene->lights.at(i)->position - intersection.position);
+      vec3 l = normalize(scene->lights.at(i)->position-intersection.position);
       rayInit(&rayonOmbre, intersection.position + acne_eps * l, l);
       
       // si l'objet n'est pas caché par une ombre
-      if (!intersectScene(scene, &rayonOmbre, &intersectionOmbre) 
-          || distance(scene->lights.at(i)->position, intersection.position) < distance(rayonOmbre.orig, intersectionOmbre.position)){
-        color += shade(intersection.normal, - ray->dir, l,
+      if (!intersectScene(scene, &rayonOmbre, &intersectionOmbre)){
+        color += shade(-intersection.normal, - ray->dir, -l,
                             scene->lights.at(i)->color, intersection.mat);
       }
     }
