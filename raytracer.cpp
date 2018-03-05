@@ -5,6 +5,7 @@
 #include "image.h"
 #include "kdtree.h"
 #include <stdio.h>
+#include <cmath>
 
 
 /// acne_eps is a small constant used to prevent acne when computing intersection
@@ -129,20 +130,30 @@ bool intersectScene(const Scene *scene, Ray *ray, Intersection *intersection) {
  * NdotH : Norm . Half
  */
 float RDM_Beckmann(float NdotH, float alpha) {
-
-
-  //! \todo compute Beckmann normal distribution
-  return 0.5f;
-
+  float NdotH2 = NdotH * NdotH;
+  float alpha2 = alpha * alpha;
+  float tan2NDotH = (1.f - NdotH2) / NdotH2;
+  return exp(-tan2NDotH / alpha2) / (M_PI * alpha2 * NdotH2 * NdotH2);
 }
 
 // Fresnel term computation. Implantation of the exact computation. we can use the Schlick approximation
 // LdotH : Light . Half
 float RDM_Fresnel(float LdotH, float extIOR, float intIOR) {
+  float rs, rp;
+  float cosTetaI = LdotH;
+  float n1 = extIOR;
+  float n2 = intIOR;
 
-  //! \todo compute Fresnel term
-  return 0.5f;
+  float sin2TetaT = pow(n1/n2, 2) * (1 - cosTetaI * cosTetaI);
+  if (sin2TetaT > 1.f) {
+    return 1;
+  }
 
+  float cosTetaT = sqrt(1 - sin2TetaT);
+  rs = pow(n1 * cosTetaI - n2 * cosTetaT, 2) / pow( n1 * cosTetaI + n2 * cosTetaT , 2);
+  rp = pow( n1 * cosTetaT - n2 * cosTetaI , 2) / pow( n1 * cosTetaT + n2 * cosTetaI, 2);
+
+  return 0.5 * (rs + rp);
 }
 
 
@@ -234,16 +245,24 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
 //! if tree is not null, use intersectKdTree to compute the intersection instead of intersect scene
 color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {  
   Intersection intersection;
+  Intersection intersectionOmbre;
 
-  if (intersectScene(scene, ray, &intersection)) {
-    // pour chaque source de lumière additionner les contributions :
+  if (intersectScene(scene, ray, &intersection)) {   // intersection entre le rayon est un objet de la scene
     color3 color = color3(0);
+    Ray rayonOmbre;
+
+    // pour chaque source de lumière additionner les contributions :
     for (size_t i = 0 ; i < scene->lights.size() ; i++) {
-      color = color + shade(-intersection.normal, -(ray->dir), 
-                            normalize(intersection.position - scene->lights.at(i)->position),
+      vec3 l = normalize(scene->lights.at(i)->position-intersection.position);
+      rayInit(&rayonOmbre, intersection.position + acne_eps * l, l);
+      
+      // si l'objet n'est pas caché par une ombre
+      if (!intersectScene(scene, &rayonOmbre, &intersectionOmbre)){
+        color += shade(-intersection.normal, - ray->dir, -l,
                             scene->lights.at(i)->color, intersection.mat);
-   
+      }
     }
+    
     return color;
   } else {
     return scene->skyColor;
