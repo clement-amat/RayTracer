@@ -12,7 +12,6 @@
 //  or boucing (add this amount to the position before casting a new ray !
 const float acne_eps = 1e-4;
 const float  INV_PI_F= 0.318309f;
-const int LIMITE_REBOND = 100;
 
 bool intersectPlane(Ray *ray, Intersection *intersection, Object *plane) {
   vec3 n = plane->geom.plane.normal;
@@ -173,7 +172,7 @@ float RDM_G1(float DdotH, float DdotN, float alpha) {
   b = 1.f / (alpha * tanTetaX);
   k = DdotH / DdotN;
 
-  if ( k > 0.f && b < 1.6f) {
+  if ( k > 0.f && b < 1.6) {
     return (3.535f * b + 2.181f * b * b) / (1.f + 2.276f * b + 2.577f * b * b);
   }
 
@@ -249,7 +248,7 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
   float VdotH = dot(v, half);
   float LdotN = dot(l, n);
   float VdotN = dot(v, n);
-  ret = color3(lc * RDM_bsdf(LdotH, NdotH, VdotH, LdotN, VdotN, mat) * LdotN);
+  ret = lc * RDM_bsdf(LdotH, NdotH, VdotH, LdotN, VdotN, mat) * LdotN;
   return ret;
 	
 }
@@ -257,39 +256,28 @@ color3 shade(vec3 n, vec3 v, vec3 l, color3 lc, Material *mat ){
 //! if tree is not null, use intersectKdTree to compute the intersection instead of intersect scene
 color3 trace_ray(Scene * scene, Ray *ray, KdTree *tree) {  
   Intersection intersection;
-  color3 color = color3(0);
+  Intersection intersectionOmbre;
 
   if (intersectScene(scene, ray, &intersection)) {   // intersection entre le rayon est un objet de la scene
+    color3 color = color3(0);
     Ray rayonOmbre;
-    Intersection intersectionOmbre;
-    Ray rayonReflechi;
 
     // pour chaque source de lumière additionner les contributions :
     for (size_t i = 0 ; i < scene->lights.size() ; i++) {
-      vec3 l = normalize(scene->lights.at(i)->position - intersection.position);
+      vec3 l = normalize(scene->lights.at(i)->position-intersection.position);
       rayInit(&rayonOmbre, intersection.position + acne_eps * l, l);
       
       // si l'objet n'est pas caché par une ombre
-      if (!intersectScene(scene, &rayonOmbre, &intersectionOmbre) 
-          || distance(scene->lights.at(i)->position, intersection.position) < distance(rayonOmbre.orig, intersectionOmbre.position)){
-        color += shade(intersection.normal, - ray->dir, l,
+      if (!intersectScene(scene, &rayonOmbre, &intersectionOmbre)){
+        color += shade(-intersection.normal, - ray->dir, -l,
                             scene->lights.at(i)->color, intersection.mat);
       }
     }
-
-
-    vec3 directionRayonReflechi = reflect(ray->dir, intersection.normal);
-    rayInit(&rayonReflechi, intersection.position + acne_eps * directionRayonReflechi, directionRayonReflechi);
-    rayonReflechi.depth = ray->depth + 1;
-    if (rayonReflechi.depth < LIMITE_REBOND) {
-      color += RDM_Fresnel(1.f, 1.f, intersection.mat->IOR) * trace_ray(scene, &rayonReflechi, tree);
-    }
-
+    
+    return color;
   } else {
-    color = scene->skyColor;
+    return scene->skyColor;
   }
-
-  return color;
 }
 
 void renderImage(Image *img, Scene *scene) {

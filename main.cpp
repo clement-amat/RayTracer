@@ -7,8 +7,8 @@
 #include "raytracer.h"
 #include "image.h"
 
-#define WIDTH 8000
-#define HEIGHT 6000
+#define WIDTH 800
+#define HEIGHT 600
 
 /* nickel :
  mat.diffuseColor = color3(0.014, 0.012, 0.012);
@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
 
     strncpy(basename, argv[1], 256);
 
-    int scene_id = 0;
+    int scene_id = 1;
     if(argc == 3) {
         scene_id = atoi(argv[2]);
     }
